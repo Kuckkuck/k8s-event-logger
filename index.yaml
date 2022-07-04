@@ -1,0 +1,26 @@
+apiVersion: v1
+entries:
+  k8s-event-logger:
+  - apiVersion: v1
+    appVersion: "1.2"
+    created: "2022-07-04T12:42:57.422796+02:00"
+    description: A tool to log k8s events to stdout in JSON
+    digest: 59eb840227dc7a94ff80af83d45bc014e855309ceb6717a5ce55acdad7f078ad
+    home: https://github.com/max-rocket-internet/k8s-event-logger
+    icon: https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png
+    keywords:
+    - events
+    - logging
+    - Auditing
+    maintainers:
+    - email: max.williams@deliveryhero.com
+      name: max-rocket-internet
+    - email: miguel.mingorance@deliveryhero.com
+      name: mmingorance-dh
+    name: k8s-event-logger
+    sources:
+    - https://github.com/max-rocket-internet/k8s-event-logger
+    urls:
+    - https://github.com/Kuckkuck/k8s-event-logger/releases/download/k8s-event-logger-1.0/k8s-event-logger-1.0.tgz
+    version: "1.0"
+generated: "2022-07-04T12:42:57.422806+02:00"
