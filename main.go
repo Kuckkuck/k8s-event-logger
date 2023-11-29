@@ -2,67 +2,67 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
-	"k8s.io/api/core/v1"
+	"flag"
+	"log"
+	"os"
+
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
-	"os"
-	"os/user"
-	"time"
+)
+
+var (
+	ignoreNormal = flag.Bool("ignore-normal", false, "ignore events of type 'Normal' to reduce noise")
 )
 
 func main() {
-	usr, err := user.Current()
+	flag.Parse()
+
+	loggerApplication := log.New(os.Stderr, "", log.LstdFlags)
+	loggerEvent := log.New(os.Stdout, "", 0)
+
+	// Using First sample from https://pkg.go.dev/k8s.io/client-go/tools/clientcmd to automatically deal with environment variables and default file paths
+
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	// if you want to change the loading rules (which files in which order), you can do so here
+
+	configOverrides := &clientcmd.ConfigOverrides{}
+	// if you want to change override values or bind them to flags, there are methods to help you
+
+	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
+
+	config, err := kubeConfig.ClientConfig()
 	if err != nil {
-		panic(err)
+		loggerApplication.Panicln(err.Error())
 	}
 
-	var config *rest.Config
-
-	if k8s_port := os.Getenv("KUBERNETES_PORT"); k8s_port == "" {
-		fmt.Println("Using local kubeconfig")
-		var kubeconfig string
-		home := usr.HomeDir
-		if home != "" {
-			kubeconfig = fmt.Sprintf("%s/.kube/config", home)
-		} else {
-			panic("home directory unknown")
-		}
-
-		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-		if err != nil {
-			panic(err.Error())
-		}
-	} else {
-		fmt.Println("Using in cluster authentication")
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			panic(err.Error())
-		}
-	}
+	// Note that this *should* automatically sanitize sensitive fields
+	loggerApplication.Println("Using configuration:", config.String())
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		panic(err.Error())
+		loggerApplication.Panicln(err.Error())
 	}
 
 	watchlist := cache.NewListWatchFromClient(
 		clientset.CoreV1().RESTClient(),
 		"events",
-		v1.NamespaceAll,
+		corev1.NamespaceAll,
 		fields.Everything(),
 	)
 	_, controller := cache.NewInformer(
 		watchlist,
-		&v1.Event{},
+		&corev1.Event{},
 		0,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
+				if (*ignoreNormal && obj.(*corev1.Event).Type == corev1.EventTypeNormal) {
+					return
+				}
 				j, _ := json.Marshal(obj)
-				fmt.Printf("%s\n", string(j))
+				loggerEvent.Printf("%s\n", string(j))
 			},
 		},
 	)
@@ -70,8 +70,5 @@ func main() {
 	stop := make(chan struct{})
 	defer close(stop)
 	go controller.Run(stop)
-	for {
-		time.Sleep(time.Second)
-	}
-
+	select {}
 }

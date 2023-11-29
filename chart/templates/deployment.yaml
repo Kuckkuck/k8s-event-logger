@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "k8s-event-logger.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
 {{ include "k8s-event-logger.labels" . | indent 4 }}
 spec:
@@ -12,6 +13,10 @@ spec:
       app.kubernetes.io/instance: {{ .Release.Name }}
   template:
     metadata:
+{{- with .Values.podAnnotations }}
+      annotations:
+{{- toYaml . | nindent 8 }}
+{{- end }}
       labels:
         app.kubernetes.io/name: {{ include "k8s-event-logger.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
@@ -25,17 +30,20 @@ spec:
     {{- end }}
       serviceAccountName: {{ include "k8s-event-logger.fullname" . }}
       containers:
-        - name: app
+        - name: {{ .Values.image.containerName }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
-            readOnlyRootFilesystem: true
-            runAsNonRoot: true
+            {{- toYaml .Values.securityContext | nindent 12 }}
           env:
 {{- range $key, $value := .Values.env }}
           - name: {{ $key }}
             value: {{ $value | quote }}
 {{- end }}
+          {{- with .Values.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
