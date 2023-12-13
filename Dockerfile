@@ -1,13 +1,13 @@
-FROM golang:1.18.3 as builder
+FROM --platform=${BUILDPLATFORM} golang:1.20.5 as builder
+ARG TARGETARCH
+ARG TARGETOS
 WORKDIR /go/src/github.com/max-rocket-internet/k8s-event-logger
 COPY . .
-RUN go get
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o k8s-event-logger
-RUN adduser --disabled-login --no-create-home --disabled-password --system --uid 101 non-root
+RUN go mod vendor
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o k8s-event-logger &&\
+    if ldd 'k8s-event-logger'; then exit 1; fi; # Ensure binary is statically-linked
 
-FROM alpine:3.15.4
-RUN addgroup -S non-root && adduser -S -G non-root non-root
-USER 101
-ENV USER non-root
-COPY --from=builder /go/src/github.com/max-rocket-internet/k8s-event-logger/k8s-event-logger k8s-event-logger
-CMD ["/k8s-event-logger"]
+FROM --platform=${TARGETPLATFORM} scratch
+COPY --from=builder /go/src/github.com/max-rocket-internet/k8s-event-logger/k8s-event-logger /
+USER 10001
+ENTRYPOINT ["/k8s-event-logger"]
